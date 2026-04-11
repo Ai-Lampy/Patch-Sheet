@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Patch Sheet Generator</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f2430;
+    --text: #eef2f7;
+    --muted: #a6b0bf;
+    --line: #31394a;
+    --accent: #76a9ff;
+    --input: #10141c;
+    --danger: #ff7373;
+    --print-text: #000;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .topbar {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 18px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.22);
+  }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; }
+  .sub { color: var(--muted); line-height: 1.4; }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .control label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  select, input[type="text"], input[type="file"], button {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--input);
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+  button {
+    background: var(--panel-2);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { border-color: var(--accent); }
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .status {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .stat {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,.02);
+  }
+  .stat .k { color: var(--muted); font-size: .8rem; }
+  .stat .v { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+
+  .pages {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 18px;
+  }
+  .page {
+    background: #fff;
+    color: #000;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #d9dee7;
+  }
+  .page-inner { padding: 18px 18px 54px 18px; position: relative; min-height: 840px; }
+  .brand {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .brand-left h2 { font-size: 1.25rem; margin-bottom: 6px; }
+  .brand-left .meta, .brand-right { font-size: .95rem; }
+  .page-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 10px;
+  }
+  .fixture-title { font-size: 1.1rem; font-weight: 700; }
+  .fixture-mode { font-size: 0.96rem; color: #333; }
+  .tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12pt;
+  }
+  .tbl thead th {
+    text-align: left;
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 6px 6px;
+    white-space: nowrap;
+  }
+  .tbl tbody td {
+    border-bottom: 1px solid #cdd3dd;
+    padding: 6px 6px;
+    vertical-align: top;
+  }
+  .tbl td.editable-cell { padding: 4px 6px; }
+  .tbl input[type="text"] {
+    background: #fff;
+    color: #000;
+    border: 1px solid #b8c1cf;
+    padding: 6px 8px;
+    min-width: 100%;
+    border-radius: 8px;
+  }
+  .tbl textarea {
+    background: #fff;
+    color: #000;
+    border: 1px solid #b8c1cf;
+    padding: 6px 8px;
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+    resize: none;
+    overflow: hidden;
+    line-height: 1.25;
+    font: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  .tbl input[type="text"].colour-input {
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .tbl th.colour-col, .tbl td.colour-col { width: 68px; }
+  .tbl th.notes-col, .tbl td.notes-col { width: 180px; }
+  .tbl input[type="text"].colour-input {
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .footer {
+    position: absolute;
+    left: 18px;
+    bottom: 14px;
+    font-size: .9rem;
+    color: #000;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  .settings-btn {
+    width: auto;
+    min-width: 180px;
+  }
+  dialog.settings-dialog {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--panel);
+    color: var(--text);
+    width: min(760px, calc(100vw - 32px));
+    padding: 0;
+    box-shadow: 0 20px 70px rgba(0,0,0,.45);
+  }
+  dialog.settings-dialog::backdrop {
+    background: rgba(0,0,0,.58);
+  }
+  .dialog-inner {
+    padding: 18px;
+  }
+  .dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .dialog-header h3 {
+    font-size: 1.05rem;
+  }
+  .dialog-close {
+    width: auto;
+    min-width: 92px;
+  }
+
+  .hint {
+    margin-top: 14px;
+    font-size: .87rem;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(118,169,255,.12);
+    border: 1px solid rgba(118,169,255,.4);
+    color: #cfe1ff;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: .8rem;
+    margin-top: 6px;
+  }
+  .warn { color: var(--danger); }
+
+  @media (max-width: 1100px) {
+    .topbar { grid-template-columns: 1fr; }
+    .controls, .summary, .btn-row { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 720px) {
+    .controls, .summary, .btn-row { grid-template-columns: 1fr; }
+    .app { padding: 12px; }
+    .page-inner { overflow-x: auto; }
+    .tbl { min-width: 980px; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .topbar { display: none !important; }
+    .app { max-width: none; padding: 0; }
+    .pages { gap: 0; margin-top: 0; }
+    .page {
+      border: none;
+      border-radius: 0;
+      break-after: page;
+      page-break-after: always;
+      box-shadow: none;
+    }
+    .page-inner {
+      min-height: auto;
+      padding: 12mm 10mm 16mm 10mm;
+    }
+  }
+
+  /* dashed column separators */
+  .tbl th,
+  .tbl td {
+    border-right: 1px dashed #808080;
+  }
+
+  .tbl th:last-child,
+  .tbl td:last-child {
+    border-right: none;
+  }
+
+  /* remove divider between Col 1 and Col 2 */
+  .tbl th:nth-last-child(2),
+  .tbl td:nth-last-child(2) {
+    border-right: none;
+  }
+
+
+  .format-btn {
+    width: auto;
+    min-width: 180px;
+    margin-right: 10px;
+  }
+  .toolbar-actions {
+    gap: 10px;
+  }
+  .format-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .format-row {
+    display: contents;
+  }
+  .format-grid .head {
+    font-size: .8rem;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .format-grid .cell label {
+    display:block;
+    font-size:.8rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .format-grid .cell {
+    min-width: 0;
+  }
+  .section-title {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-size: .95rem;
+    font-weight: 700;
+  }
+
+
+  .format-actions {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+    align-items: end;
+  }
+  .column-select-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px 12px;
+    margin-top: 10px;
+  }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .9rem;
+  }
+  .check-item input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .toggle-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--input);
+  }
+  .toggle-pill input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+
+
+  .project-section-title {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-size: .95rem;
+    font-weight: 700;
+  }
+  .project-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr 160px;
+    gap: 10px;
+    align-items: end;
+  }
+  .project-grid .toggle-pill {
+    justify-content: center;
+  }
+  .project-grid .full-row {
+    grid-column: 1 / -1;
+  }
+  @media (max-width: 720px) {
+    .project-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="panel">
+        <h1>Patch Sheet Generator</h1>
+        <p class="sub">Upload a patch CSV and generate printable patch-by-type pages. Only <strong>Notes</strong> and <strong>Colour</strong> stay editable. Filters can slice the view by Type, Mode, Uni, or Position.</p>
+        <div class="badge">Built for your patch-by-type layout</div>
+        <div class="controls">
+          <div class="control" style="grid-column: 1 / -1;">
+            <label>CSV file</label>
+            <input id="csvFile" type="file" accept=".csv,text/csv" />
+          </div>
+          <div class="control">
+            <label>Filter by Type</label>
+            <select id="typeFilter"><option value="">All Types</option></select>
+          </div>
+          <div class="control">
+            <label>Filter by Mode</label>
+            <select id="modeFilter"><option value="">All Modes</option></select>
+          </div>
+          <div class="control">
+            <label>Filter by Uni</label>
+            <select id="uniFilter"><option value="">All Universes</option></select>
+          </div>
+          <div class="control">
+            <label>Filter by Position</label>
+            <select id="positionFilter"><option value="">All Positions</option></select>
+          </div>
+          <div class="control">
+            <label>Sort by</label>
+            <select id="sortField">
+              <option value="default">Fix ID</option>
+              <option value="type">Type</option>
+              <option value="mode">Mode</option>
+              <option value="uni">Uni</option>
+              <option value="position">Position</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Sort direction</label>
+            <select id="sortDirection">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="loadSampleBtn" type="button">Load sample data</button>
+          <button id="clearFiltersBtn" type="button">Clear filters</button>
+          <button id="printBtn" type="button">Print / Save PDF</button>
+          <button id="downloadTemplateBtn" type="button">Download Template CSV</button>
+        </div>
+        <div class="status" id="status">No CSV loaded yet.</div>
+        <div class="hint">
+          Expected columns: <strong>#</strong>, <strong>Uni</strong>, <strong>Add</strong>, <strong>Type</strong>, <strong>Mode</strong>, <strong>Chan</strong>, <strong>Position</strong>, optional <strong>Col</strong>/<strong>Col 1</strong> and <strong>Col 2</strong>.<br>
+          Aliases are supported too: <em>Unit, Universe, Address, Fixture Type, Fixture Mode, Channels, Colour, Color</em>.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar-actions">
+          <button id="openFormatBtn" class="format-btn" type="button">Sheet Format</button>
+          <button id="openProjectInfoBtn" class="settings-btn" type="button">Project Info</button>
+          <button id="openSettingsBtn" class="settings-btn" type="button">Job Details / Settings</button>
+        </div>
+        <div class="summary">
+          <div class="stat"><div class="k">Rows in view</div><div class="v" id="rowsCount">0</div></div>
+          <div class="stat"><div class="k">Types in view</div><div class="v" id="typesCount">0</div></div>
+          <div class="stat"><div class="k">Pages</div><div class="v" id="pagesCount">0</div></div>
+          <div class="stat"><div class="k">Unique universes</div><div class="v" id="unisCount">0</div></div>
+        </div>
+        <div class="hint">Notes, Col 1, Col 2, and your colour mapping table are stored in your browser, so they stay put when you reload the same CSV.</div>
+      </div>
+    </div>
+
+
+    <dialog id="settingsDialog" class="settings-dialog">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h3>Job Details / Settings</h3>
+          <button id="closeSettingsBtn" class="dialog-close" type="button">Close</button>
+        </div>
+        <div class="controls dialog-fields">
+          <div class="control">
+            <label>Company / header</label>
+            <input id="companyInput" type="text" value="MAndrews Lighting" />
+          </div>
+          <div class="control">
+            <label>Email / contact line</label>
+            <input id="contactInput" type="text" value="mitch@mandrewslighting.com \ +44 7788 430 165" />
+          </div>
+          <div class="control">
+            <label>Document title</label>
+            <input id="docTitleInput" type="text" value="Patch by Type" />
+          </div>
+          <div class="control">
+            <label>Job / file name</label>
+            <input id="jobNameInput" type="text" value="Imported Patch" />
+          </div>
+          <div class="control full-span">
+            <label>Colour mapping table</label>
+            <textarea id="colourMappingInput" class="mapping-input" spellcheck="false"></textarea>
+            <div class="mapping-help">One mapping per line in the format <strong>alias=color</strong>. Example: <code>L201=#0047AB</code> or <code>R=red</code>. This lets short show codes in Col 1 / Col 2 display real colours.</div>
+            <div class="mapping-tools">
+              <input id="mappingFileInput" type="file" accept=".txt,.csv" />
+              <button id="resetMappingBtn" type="button">Reset colour map</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    
+    
+    <dialog id="formatDialog" class="settings-dialog">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h3>Sheet Format</h3>
+          <button id="closeFormatBtn" class="dialog-close" type="button">Close</button>
+        </div>
+
+        <div class="controls dialog-fields">
+          <div class="control">
+            <label>Font</label>
+            <select id="fontFamilyInput">
+              <option value="Arial, Helvetica, sans-serif">Arial</option>
+              <option value="Cochin, Georgia, serif">Cochin</option>
+              <option value="Cochin, Georgia, serif|bold">Cochin Bold</option>
+              <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sands</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section-title">Column Selection</div>
+        <div class="toggle-row" style="margin-top:0; margin-bottom:10px;">
+          <label class="toggle-pill"><input id="selectAllColumns" type="checkbox" /> Select All</label>
+        </div>
+        <div class="column-select-grid" id="columnSelectGrid"></div>
+
+        <div class="section-title">Selected Column Formatting</div>
+        <div class="format-actions">
+          <div class="control">
+            <label>Align</label>
+            <select id="columnAlign">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div class="control" style="grid-column: span 5;">
+            <label>Styles</label>
+            <div class="toggle-row">
+              <label class="toggle-pill"><input id="columnBold" type="checkbox" /> Bold</label>
+              <label class="toggle-pill"><input id="columnItalic" type="checkbox" /> Italic</label>
+              <label class="toggle-pill"><input id="columnUnderline" type="checkbox" /> Underline</label>
+              <button id="applyColumnFormatBtn" type="button" style="width:auto; min-width:180px;">Apply to Selected Columns</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">Fixture Title Sub-header</div>
+        <div class="controls dialog-fields">
+          <div class="control">
+            <label>Align</label>
+            <select id="subheaderAlign">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Bold</label>
+            <div class="toggle-row"><label class="toggle-pill"><input id="subheaderBold" type="checkbox" /> On</label></div>
+          </div>
+          <div class="control">
+            <label>Italic</label>
+            <div class="toggle-row"><label class="toggle-pill"><input id="subheaderItalic" type="checkbox" /> On</label></div>
+          </div>
+          <div class="control">
+            <label>Underline</label>
+            <div class="toggle-row"><label class="toggle-pill"><input id="subheaderUnderline" type="checkbox" /> On</label></div>
+          </div>
+          <div class="control">
+            <label>Size</label>
+            <select id="subheaderSize">
+              <option value="10">Small (10pts)</option>
+              <option value="14" selected>Medium (14pts)</option>
+              <option value="18">Large (18pts)</option>
+              <option value="22">Extra Large (22pts)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+
+
+    
+    <dialog id="projectInfoDialog" class="settings-dialog">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h3>Project Info</h3>
+          <button id="closeProjectInfoBtn" class="dialog-close" type="button">Close</button>
+        </div>
+
+        <div class="project-section-title">File Info</div>
+        <div class="project-grid" id="fileInfoGrid"></div>
+
+        <div class="project-section-title">Production Info</div>
+        <div class="project-grid" id="productionInfoGrid"></div>
+      </div>
+    </dialog>
+
+
+    <div class="pages" id="pages"></div>
+
+  </div>
+
+<script>
+(() => {
+  const els = {
+    file: document.getElementById('csvFile'),
+    typeFilter: document.getElementById('typeFilter'),
+    modeFilter: document.getElementById('modeFilter'),
+    uniFilter: document.getElementById('uniFilter'),
+    positionFilter: document.getElementById('positionFilter'),
+    sortField: document.getElementById('sortField'),
+    sortDirection: document.getElementById('sortDirection'),
+    loadSampleBtn: document.getElementById('loadSampleBtn'),
+    clearFiltersBtn: document.getElementById('clearFiltersBtn'),
+    printBtn: document.getElementById('printBtn'),
+    downloadTemplateBtn: document.getElementById('downloadTemplateBtn'),
+    status: document.getElementById('status'),
+    pages: document.getElementById('pages'),
+    rowsCount: document.getElementById('rowsCount'),
+    typesCount: document.getElementById('typesCount'),
+    pagesCount: document.getElementById('pagesCount'),
+    unisCount: document.getElementById('unisCount'),
+    companyInput: document.getElementById('companyInput'),
+    contactInput: document.getElementById('contactInput'),
+    docTitleInput: document.getElementById('docTitleInput'),
+    jobNameInput: document.getElementById('jobNameInput'),
+    openProjectInfoBtn: document.getElementById('openProjectInfoBtn'),
+    closeProjectInfoBtn: document.getElementById('closeProjectInfoBtn'),
+    projectInfoDialog: document.getElementById('projectInfoDialog'),
+    fileInfoGrid: document.getElementById('fileInfoGrid'),
+    productionInfoGrid: document.getElementById('productionInfoGrid'),
+    openSettingsBtn: document.getElementById('openSettingsBtn'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    settingsDialog: document.getElementById('settingsDialog'),
+    colourMappingInput: document.getElementById('colourMappingInput'),
+    mappingFileInput: document.getElementById('mappingFileInput'),
+    resetMappingBtn: document.getElementById('resetMappingBtn'),
+    openFormatBtn: document.getElementById('openFormatBtn'),
+    closeFormatBtn: document.getElementById('closeFormatBtn'),
+    formatDialog: document.getElementById('formatDialog'),
+    fontFamilyInput: document.getElementById('fontFamilyInput'),
+    columnSelectGrid: document.getElementById('columnSelectGrid'),
+    selectAllColumns: document.getElementById('selectAllColumns'),
+    columnAlign: document.getElementById('columnAlign'),
+    columnBold: document.getElementById('columnBold'),
+    columnItalic: document.getElementById('columnItalic'),
+    columnUnderline: document.getElementById('columnUnderline'),
+    applyColumnFormatBtn: document.getElementById('applyColumnFormatBtn'),
+    subheaderAlign: document.getElementById('subheaderAlign'),
+    subheaderBold: document.getElementById('subheaderBold'),
+    subheaderItalic: document.getElementById('subheaderItalic'),
+    subheaderUnderline: document.getElementById('subheaderUnderline'),
+    subheaderSize: document.getElementById('subheaderSize')
+  };
+
+  let rawRows = [];
+
+  const STORAGE_KEY = 'patch_sheet_generator_notes_v1';
+  const COLOUR_MAP_STORAGE_KEY = 'patch_sheet_generator_colour_map_v1';
+  const editState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+
+  const FORMAT_STORAGE_KEY = 'patch_sheet_generator_format_v1';
+  const columnDefs = [
+    { key: 'number', label: 'Fix ID' },
+    { key: 'uni', label: 'Uni' },
+    { key: 'add', label: 'Add' },
+    { key: 'type', label: 'Type' },
+    { key: 'mode', label: 'Mode' },
+    { key: 'chan', label: 'Chan' },
+    { key: 'position', label: 'Position' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'colour1', label: 'Col 1' },
+    { key: 'colour2', label: 'Col 2' }
+  ];
+  const defaultFormatState = {
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontWeightOverride: 'normal',
+    columns: {
+      number: { align: 'left', bold: false, italic: false, underline: false },
+      uni: { align: 'left', bold: false, italic: false, underline: false },
+      add: { align: 'left', bold: false, italic: false, underline: false },
+      type: { align: 'left', bold: false, italic: false, underline: false },
+      mode: { align: 'left', bold: false, italic: false, underline: false },
+      chan: { align: 'left', bold: false, italic: false, underline: false },
+      position: { align: 'left', bold: false, italic: false, underline: false },
+      notes: { align: 'left', bold: false, italic: false, underline: false },
+      colour1: { align: 'center', bold: false, italic: false, underline: false },
+      colour2: { align: 'center', bold: false, italic: false, underline: false }
+    },
+    subheader: { align: 'left', bold: false, italic: false, underline: false, size: 14 }
+  };
+
+  function deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function getFormatState() {
+    const stored = localStorage.getItem(FORMAT_STORAGE_KEY);
+    if (!stored) return deepClone(defaultFormatState);
+    try {
+      const parsed = JSON.parse(stored);
+      const merged = deepClone(defaultFormatState);
+      if (parsed.fontFamily) merged.fontFamily = parsed.fontFamily;
+      if (parsed.fontWeightOverride) merged.fontWeightOverride = parsed.fontWeightOverride;
+      if (parsed.columns) {
+        Object.keys(merged.columns).forEach(key => {
+          if (parsed.columns[key]) merged.columns[key] = { ...merged.columns[key], ...parsed.columns[key] };
+        });
+      }
+      if (parsed.subheader) merged.subheader = { ...merged.subheader, ...parsed.subheader };
+      return merged;
+    } catch (e) {
+      return deepClone(defaultFormatState);
+    }
+  }
+
+  let formatState = getFormatState();
+
+  function saveFormatState() {
+    localStorage.setItem(FORMAT_STORAGE_KEY, JSON.stringify(formatState));
+  }
+
+  const PROJECT_INFO_STORAGE_KEY = 'patch_sheet_generator_project_info_v1';
+  const VENDOR_SHEET_URLS_STORAGE_KEY = 'patch_sheet_generator_vendor_sheet_urls_v1';
+  const DEFAULT_VENDOR_SHEET_URLS = {
+    vendors: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXxEq-5bB95JSn7PJ3fqBjdh0mdZ0RZjx4JbzwoeR7-nfrwiBagk-0egTHr8HCgb_GVfrYRIJY_dhy/pub?gid=0&single=true&output=csv',
+    vendorDetails: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXxEq-5bB95JSn7PJ3fqBjdh0mdZ0RZjx4JbzwoeR7-nfrwiBagk-0egTHr8HCgb_GVfrYRIJY_dhy/pub?gid=1224276292&single=true&output=csv'
+  };
+
+  function getVendorSheetUrls() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(VENDOR_SHEET_URLS_STORAGE_KEY) || 'null');
+      return {
+        vendors: stored?.vendors || DEFAULT_VENDOR_SHEET_URLS.vendors,
+        vendorDetails: stored?.vendorDetails || DEFAULT_VENDOR_SHEET_URLS.vendorDetails
+      };
+    } catch (e) {
+      return { ...DEFAULT_VENDOR_SHEET_URLS };
+    }
+  }
+
+  function saveVendorSheetUrls(urls) {
+    localStorage.setItem(VENDOR_SHEET_URLS_STORAGE_KEY, JSON.stringify(urls));
+  }
+
+  const vendorOptionsDefault = [];
+
+  const projectInfoSchema = {
+    file: [
+      { key: 'fileName', label: 'File Name', type: 'text' },
+      { key: 'project', label: 'Project', type: 'text' },
+      { key: 'projectDates', label: 'Project Dates', type: 'text' },
+      { key: 'version', label: 'Version', type: 'text' },
+      { key: 'versionDate', label: 'Version Date', type: 'text' }
+    ],
+    production: [
+      { key: 'tourManager', label: 'Tour Manager', type: 'text' },
+      { key: 'productionManager', label: 'Production Manager', type: 'text' },
+      { key: 'lightingDesigner', label: 'Lighting Designer', type: 'text' },
+      { key: 'lightingOp', label: 'Lighting Op', type: 'text' },
+      { key: 'lightingCrewChief', label: 'Lighting Crew Chief', type: 'text' },
+      { key: 'lightingVendor', label: 'Lighting Vendor', type: 'vendor' },
+      { key: 'vendorRep', label: 'Vendor Rep', type: 'text' },
+      { key: 'vendorDetails', label: 'Vendor Details', type: 'vendorDetails' }
+    ]
+  };
+
+  function getDefaultProjectInfoState() {
+    const state = {
+      fields: {},
+      vendors: [...vendorOptionsDefault],
+      vendorDetailsMap: {}
+    };
+    [...projectInfoSchema.file, ...projectInfoSchema.production].forEach(field => {
+      state.fields[field.key] = { value: '', visible: false };
+    });
+    return state;
+  }
+
+  function getProjectInfoState() {
+    const fallback = getDefaultProjectInfoState();
+    try {
+      const stored = JSON.parse(localStorage.getItem(PROJECT_INFO_STORAGE_KEY) || 'null');
+      if (!stored) return fallback;
+      const merged = getDefaultProjectInfoState();
+      merged.vendors = Array.isArray(stored.vendors) && stored.vendors.length ? stored.vendors : fallback.vendors;
+      merged.vendorDetailsMap = stored.vendorDetailsMap && typeof stored.vendorDetailsMap === 'object' ? stored.vendorDetailsMap : {};
+      if (stored.fields && typeof stored.fields === 'object') {
+        Object.keys(merged.fields).forEach(key => {
+          if (stored.fields[key]) {
+            merged.fields[key] = {
+              value: typeof stored.fields[key].value === 'string' ? stored.fields[key].value : '',
+              visible: !!stored.fields[key].visible
+            };
+          }
+        });
+      }
+      return merged;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  let projectInfoState = getProjectInfoState();
+
+  function saveProjectInfoState() {
+    localStorage.setItem(PROJECT_INFO_STORAGE_KEY, JSON.stringify(projectInfoState));
+  }
+
+  function makeProjectRow(field, section) {
+    const fieldState = projectInfoState.fields[field.key] || { value: '', visible: false };
+    const safeLabel = escapeHtml(field.label);
+    if (field.type === 'vendor') {
+      const options = [...projectInfoState.vendors, 'Add new...'].map(v => {
+        const selected = fieldState.value === v ? ' selected' : '';
+        return `<option value="${escapeAttr(v)}"${selected}>${escapeHtml(v)}</option>`;
+      }).join('');
+      return `
+        <div class="control"><label>${safeLabel}</label></div>
+        <div class="control">
+          <select data-project-field="${field.key}" data-project-type="vendorSelect">
+            <option value="">Select vendor</option>
+            ${options}
+          </select>
+        </div>
+        <div class="control">
+          <label class="toggle-pill"><input type="checkbox" data-project-visible="${field.key}" ${fieldState.visible ? 'checked' : ''}/> Show</label>
+        </div>`;
+    }
+    if (field.type === 'vendorDetails') {
+      const currentVendor = projectInfoState.fields.lightingVendor?.value || '';
+      const linkedValue = fieldState.value || '';
+      return `
+        <div class="control"><label>${safeLabel}</label></div>
+        <div class="control">
+          <input type="text" data-project-field="${field.key}" data-project-type="vendorDetails" value="${escapeAttr(linkedValue)}" placeholder="Linked to selected vendor" />
+        </div>
+        <div class="control">
+          <label class="toggle-pill"><input type="checkbox" data-project-visible="${field.key}" ${fieldState.visible ? 'checked' : ''}/> Show</label>
+        </div>`;
+    }
+    return `
+      <div class="control"><label>${safeLabel}</label></div>
+      <div class="control">
+        <input type="text" data-project-field="${field.key}" value="${escapeAttr(fieldState.value || '')}" />
+      </div>
+      <div class="control">
+        <label class="toggle-pill"><input type="checkbox" data-project-visible="${field.key}" ${fieldState.visible ? 'checked' : ''}/> Show</label>
+      </div>`;
+  }
+
+  function syncVendorDetailsField() {
+    const vendor = projectInfoState.fields.lightingVendor?.value || '';
+    const mapped = vendor ? (projectInfoState.vendorDetailsMap[vendor] || '') : '';
+    projectInfoState.fields.vendorDetails.value = mapped;
+    const input = document.querySelector('[data-project-field="vendorDetails"]');
+    if (input) input.value = mapped;
+  }
+
+  function renderProjectInfoDialog() {
+    els.fileInfoGrid.innerHTML = projectInfoSchema.file.map(f => makeProjectRow(f, 'file')).join('');
+    els.productionInfoGrid.innerHTML = projectInfoSchema.production.map(f => makeProjectRow(f, 'production')).join('');
+
+    els.fileInfoGrid.querySelectorAll('[data-project-field], [data-project-visible]').forEach(bindProjectInfoControl);
+    els.productionInfoGrid.querySelectorAll('[data-project-field], [data-project-visible]').forEach(bindProjectInfoControl);
+    syncVendorDetailsField();
+  }
+
+  function bindProjectInfoControl(el) {
+    if (el.dataset.projectVisible) {
+      el.addEventListener('change', e => {
+        const key = e.target.dataset.projectVisible;
+        projectInfoState.fields[key].visible = !!e.target.checked;
+        saveProjectInfoState();
+      });
+      return;
+    }
+
+    if (el.dataset.projectType === 'vendorSelect') {
+      el.addEventListener('change', e => {
+        const value = e.target.value;
+        if (value === 'Add new...') {
+          const newVendor = window.prompt('Enter new lighting vendor');
+          if (newVendor && newVendor.trim()) {
+            const clean = newVendor.trim();
+            if (!projectInfoState.vendors.includes(clean)) projectInfoState.vendors.push(clean);
+            projectInfoState.fields.lightingVendor.value = clean;
+          } else {
+            e.target.value = projectInfoState.fields.lightingVendor.value || '';
+          }
+          saveProjectInfoState();
+          renderProjectInfoDialog();
+        } else {
+          projectInfoState.fields.lightingVendor.value = value;
+          saveProjectInfoState();
+          syncVendorDetailsField();
+        }
+      });
+      return;
+    }
+
+    if (el.dataset.projectType === 'vendorDetails') {
+      el.addEventListener('input', e => {
+        const vendor = projectInfoState.fields.lightingVendor?.value || '';
+        const val = e.target.value;
+        projectInfoState.fields.vendorDetails.value = val;
+        if (vendor) projectInfoState.vendorDetailsMap[vendor] = val;
+        saveProjectInfoState();
+      });
+      return;
+    }
+
+    el.addEventListener('input', e => {
+      const key = e.target.dataset.projectField;
+      projectInfoState.fields[key].value = e.target.value;
+      saveProjectInfoState();
+    });
+  }
+
+  async function syncVendorsFromGoogleSheet() {
+    const urls = getVendorSheetUrls();
+    const vendorsUrl = String(urls.vendors || '').trim();
+    const vendorDetailsUrl = String(urls.vendorDetails || '').trim();
+
+    if (!vendorsUrl || !vendorDetailsUrl) {
+      throw new Error('Google Sheet vendor source is not configured.');
+    }
+
+    const [vendorsResp, detailsResp] = await Promise.all([
+      fetch(vendorsUrl, { cache: 'no-store' }),
+      fetch(vendorDetailsUrl, { cache: 'no-store' })
+    ]);
+
+    if (!vendorsResp.ok) throw new Error('Could not load Vendors sheet.');
+    if (!detailsResp.ok) throw new Error('Could not load Vendor_Details sheet.');
+
+    const [vendorsCsv, detailsCsv] = await Promise.all([
+      vendorsResp.text(),
+      detailsResp.text()
+    ]);
+
+    const vendorsTable = parseCSV(vendorsCsv);
+    const detailsTable = parseCSV(detailsCsv);
+
+    if (!vendorsTable.length) throw new Error('Vendors sheet is empty.');
+    if (!detailsTable.length) throw new Error('Vendor_Details sheet is empty.');
+
+    const vendorsHeaders = vendorsTable[0].map(h => String(h || '').trim());
+    const detailsHeaders = detailsTable[0].map(h => String(h || '').trim());
+
+    const vendorIdx = findColumnIndex(vendorsHeaders, ['Vendor']);
+    const activeIdx = findColumnIndex(vendorsHeaders, ['Active']);
+
+    const detailVendorIdx = findColumnIndex(detailsHeaders, ['Vendor']);
+    const addressIdx = findColumnIndex(detailsHeaders, ['Address']);
+
+    if (vendorIdx === -1 || activeIdx === -1) {
+      throw new Error('Vendors sheet must have Vendor and Active columns.');
+    }
+    if (detailVendorIdx === -1 || addressIdx === -1) {
+      throw new Error('Vendor_Details sheet must have Vendor and Address columns.');
+    }
+
+    const activeVendors = vendorsTable.slice(1)
+      .map(r => ({
+        vendor: String(r[vendorIdx] ?? '').trim(),
+        active: String(r[activeIdx] ?? '').trim().toLowerCase()
+      }))
+      .filter(r => r.vendor && ['yes', 'y', 'true', '1'].includes(r.active))
+      .map(r => r.vendor);
+
+    const detailsMap = {};
+    detailsTable.slice(1).forEach(r => {
+      const vendor = String(r[detailVendorIdx] ?? '').trim();
+      const address = String(r[addressIdx] ?? '').trim();
+      if (vendor) detailsMap[vendor] = address;
+    });
+
+    projectInfoState.vendors = activeVendors;
+    projectInfoState.vendorDetailsMap = detailsMap;
+
+    const currentVendor = projectInfoState.fields.lightingVendor?.value || '';
+    if (currentVendor && !activeVendors.includes(currentVendor)) {
+      projectInfoState.fields.lightingVendor.value = '';
+      projectInfoState.fields.vendorDetails.value = '';
+    } else {
+      syncVendorDetailsField();
+    }
+
+    saveProjectInfoState();
+    renderProjectInfoDialog();
+    els.status.textContent = `Synced ${activeVendors.length} vendors from Google Sheet.`;
+  }
+
+
+  function styleFromFormat(fmt) {
+    return [
+      `text-align:${fmt.align || 'left'}`,
+      `font-weight:${fmt.bold ? '700' : '400'}`,
+      `font-style:${fmt.italic ? 'italic' : 'normal'}`,
+      `text-decoration:${fmt.underline ? 'underline' : 'none'}`
+    ].join(';');
+  }
+
+  function textInputStyleFromFormat(fmt) {
+    return styleFromFormat(fmt);
+  }
+
+
+  function buildColumnFormatControls() {
+    const frag = document.createDocumentFragment();
+    columnDefs.forEach(col => {
+      const wrap = document.createElement('label');
+      wrap.className = 'check-item';
+      wrap.innerHTML = `<input type="checkbox" data-col-select="${col.key}" /> <span>${col.label}</span>`;
+      frag.appendChild(wrap);
+    });
+
+    els.columnSelectGrid.innerHTML = '';
+    els.columnSelectGrid.appendChild(frag);
+
+    const syncSelectAllState = () => {
+      const boxes = [...els.columnSelectGrid.querySelectorAll('[data-col-select]')];
+      const checkedCount = boxes.filter(box => box.checked).length;
+      els.selectAllColumns.checked = boxes.length > 0 && checkedCount === boxes.length;
+      els.selectAllColumns.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+    };
+
+    els.columnSelectGrid.querySelectorAll('[data-col-select]').forEach(box => {
+      box.addEventListener('change', syncSelectAllState);
+    });
+
+    els.selectAllColumns.checked = false;
+    els.selectAllColumns.indeterminate = false;
+    els.selectAllColumns.onchange = () => {
+      const checked = !!els.selectAllColumns.checked;
+      els.columnSelectGrid.querySelectorAll('[data-col-select]').forEach(box => {
+        box.checked = checked;
+      });
+      els.selectAllColumns.indeterminate = false;
+    };
+  }
+
+  function syncFormatDialog() {
+    const fontValue = formatState.fontWeightOverride === '700'
+      ? 'Cochin, Georgia, serif|bold'
+      : formatState.fontFamily;
+    els.fontFamilyInput.value = fontValue;
+    els.columnAlign.value = 'center';
+    els.columnBold.checked = false;
+    els.columnItalic.checked = false;
+    els.columnUnderline.checked = false;
+    els.subheaderAlign.value = formatState.subheader.align;
+    els.subheaderBold.checked = !!formatState.subheader.bold;
+    els.subheaderItalic.checked = !!formatState.subheader.italic;
+    els.subheaderUnderline.checked = !!formatState.subheader.underline;
+    els.subheaderSize.value = String(formatState.subheader.size);
+    buildColumnFormatControls();
+  }
+
+
+  const defaultColourMapText = `
+R=red
+RED=red
+DR=darkred
+B=blue
+BLUE=blue
+LB=deepskyblue
+DB=darkblue
+G=green
+GREEN=green
+DG=darkgreen
+LIME=lime
+AMBER=orange
+A=orange
+ORANGE=orange
+Y=yellow
+YELLOW=yellow
+CTO=#ffb347
+CTB=#6fa8dc
+M=magenta
+MAGENTA=magenta
+P=purple
+PURPLE=purple
+LAV=lavender
+CYAN=cyan
+C=cyan
+UV=#6f00ff
+PINK=hotpink
+WHITE=white
+W=white
+WW=#fff4cf
+CW=#f5faff
+MINT=#98ff98
+TEAL=teal
+GOLD=gold
+SILVER=silver`;
+
+  const columnAliases = {
+    number: ['#', 'no', 'number', 'unit', 'fixture', 'fixture number'],
+    uni: ['uni', 'universe', 'dmx universe'],
+    add: ['add', 'address', 'dmx address', 'start address'],
+    type: ['type', 'fixture type'],
+    mode: ['mode', 'fixture mode'],
+    chan: ['chan', 'channels', 'channel count', 'ch'],
+    position: ['position', 'pos', 'location', 'truss', 'pipe'],
+    notes: ['notes', 'note', 'comments', 'comment', 'remarks'],
+    colour1: ['col 1', 'colour 1', 'color 1', 'col', 'colour', 'color', 'gel', 'fixture colour', 'fixture color'],
+    colour2: ['col 2', 'colour 2', 'color 2', 'gel 2', 'fixture colour 2', 'fixture color 2']
+  };
+
+  els.colourMappingInput.value = getColourMapText();
+
+  function normalizeColourAlias(value) {
+    return String(value || '').trim().toUpperCase();
+  }
+
+  function parseColourMap(text) {
+    const map = {};
+    String(text || '').split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('# ')) return;
+      const sep = trimmed.indexOf('=');
+      if (sep === -1) return;
+      const key = normalizeColourAlias(trimmed.slice(0, sep));
+      const value = trimmed.slice(sep + 1).trim();
+      if (key && value) map[key] = value;
+    });
+    return map;
+  }
+
+  function getColourMapText() {
+    return localStorage.getItem(COLOUR_MAP_STORAGE_KEY) || defaultColourMapText.trim();
+  }
+
+  function saveColourMapText(text) {
+    localStorage.setItem(COLOUR_MAP_STORAGE_KEY, text);
+  }
+
+  function convertMappingCsvToText(text) {
+    const rows = parseCSV(text);
+    if (!rows.length) return '';
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const aliasIdx = headers.findIndex(h => ['alias', 'code', 'key', 'name', 'short'].includes(h));
+    const colourIdx = headers.findIndex(h => ['colour', 'color', 'css', 'value', 'mapped colour', 'mapped color'].includes(h));
+    if (aliasIdx === -1 || colourIdx === -1) return '';
+    return rows
+      .slice(1)
+      .map(r => `${String(r[aliasIdx] || '').trim()}=${String(r[colourIdx] || '').trim()}`)
+      .filter(line => line && !line.startsWith('=')).join('\n');
+  }
+
+  function normalizeHeader(value) {
+    return String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  function findColumnIndex(headers, aliases) {
+    const normalized = headers.map(normalizeHeader);
+    for (const alias of aliases) {
+      const idx = normalized.indexOf(normalizeHeader(alias));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      const next = text[i + 1];
+
+      if (c === '"') {
+        if (inQuotes && next === '"') {
+          value += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (c === ',' && !inQuotes) {
+        row.push(value);
+        value = '';
+      } else if ((c === '\n' || c === '\r') && !inQuotes) {
+        if (c === '\r' && next === '\n') i++;
+        row.push(value);
+        if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+        row = [];
+        value = '';
+      } else {
+        value += c;
+      }
+    }
+    if (value.length || row.length) {
+      row.push(value);
+      if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+    }
+    return rows;
+  }
+
+  function toStructuredRows(csvText, sourceName = 'Imported CSV') {
+    const table = parseCSV(csvText);
+    if (!table.length) return [];
+
+    const headers = table[0].map(h => String(h || '').trim());
+    const dataRows = table.slice(1);
+
+    const idx = {
+      number: findColumnIndex(headers, columnAliases.number),
+      uni: findColumnIndex(headers, columnAliases.uni),
+      add: findColumnIndex(headers, columnAliases.add),
+      type: findColumnIndex(headers, columnAliases.type),
+      mode: findColumnIndex(headers, columnAliases.mode),
+      chan: findColumnIndex(headers, columnAliases.chan),
+      position: findColumnIndex(headers, columnAliases.position),
+      notes: findColumnIndex(headers, columnAliases.notes),
+      colour1: findColumnIndex(headers, columnAliases.colour1),
+      colour2: findColumnIndex(headers, columnAliases.colour2)
+    };
+
+    const required = ['number', 'uni', 'add', 'type', 'mode', 'chan', 'position'];
+    const missing = required.filter(k => idx[k] === -1);
+    if (missing.length) {
+      throw new Error('Missing required columns: ' + missing.join(', '));
+    }
+
+    return dataRows.map((r, i) => {
+      const row = {
+        number: String(r[idx.number] ?? '').trim(),
+        uni: String(r[idx.uni] ?? '').trim(),
+        add: String(r[idx.add] ?? '').trim(),
+        type: String(r[idx.type] ?? '').trim(),
+        mode: String(r[idx.mode] ?? '').trim(),
+        chan: String(r[idx.chan] ?? '').trim(),
+        position: String(r[idx.position] ?? '').trim(),
+        notesFromCSV: idx.notes === -1 ? '' : String(r[idx.notes] ?? '').trim(),
+        colour1FromCSV: idx.colour1 === -1 ? '' : String(r[idx.colour1] ?? '').trim(),
+        colour2FromCSV: idx.colour2 === -1 ? '' : String(r[idx.colour2] ?? '').trim(),
+        _source: sourceName,
+        _rowIndex: i + 2
+      };
+      row._key = [row.number, row.uni, row.add, row.type, row.mode, row.position].join('|');
+      editState[row._key] = {
+        notes: row.notesFromCSV || '',
+        colour1: row.colour1FromCSV || '',
+        colour2: row.colour2FromCSV || ''
+      };
+      return row;
+    });
+  }
+
+  function compareField(a, b, field, direction = 'asc') {
+    const dir = direction === 'desc' ? -1 : 1;
+
+    if (field === 'uni' || field === 'add' || field === 'number') {
+      const av = Number(a[field]);
+      const bv = Number(b[field]);
+      if (!Number.isNaN(av) && !Number.isNaN(bv) && av !== bv) return (av - bv) * dir;
+    }
+
+    const result = String(a[field] || '').localeCompare(String(b[field] || ''), undefined, { numeric: true, sensitivity: 'base' });
+    if (result) return result * dir;
+    return 0;
+  }
+
+  function defaultCompare(a, b) {
+    const order = ['type', 'mode', 'uni', 'add', 'number', 'position'];
+    for (const field of order) {
+      const result = compareField(a, b, field, 'asc');
+      if (result) return result;
+    }
+    return 0;
+  }
+
+  function sortRows(rows) {
+    const selectedSort = els.sortField.value || 'default';
+    const direction = els.sortDirection.value || 'asc';
+
+    return [...rows].sort((a, b) => {
+      if (selectedSort === 'default' || selectedSort === 'number') {
+        return compareField(a, b, 'number', direction) || defaultCompare(a, b);
+      }
+
+      const primary = compareField(a, b, selectedSort, direction);
+      if (primary) return primary;
+
+      return defaultCompare(a, b);
+    });
+  }
+
+  function uniqueValues(rows, field) {
+    return [...new Set(rows.map(r => r[field]).filter(Boolean))].sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }
+
+  function setSelectOptions(select, values, allLabel) {
+    const current = select.value;
+    select.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = allLabel;
+    select.appendChild(all);
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    });
+    select.value = values.includes(current) ? current : '';
+  }
+
+  function filteredRows() {
+    return rawRows.filter(r => {
+      if (els.typeFilter.value && r.type !== els.typeFilter.value) return false;
+      if (els.modeFilter.value && r.mode !== els.modeFilter.value) return false;
+      if (els.uniFilter.value && r.uni !== els.uniFilter.value) return false;
+      if (els.positionFilter.value && r.position !== els.positionFilter.value) return false;
+      return true;
+    });
+  }
+
+  function groupRows(rows) {
+    const map = new Map();
+    rows.forEach(row => {
+      const key = row.type || 'Unspecified Type';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    });
+    return [...map.entries()].map(([type, items]) => ({
+      type,
+      items
+    }));
+  }
+
+  function saveEditState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(editState));
+  }
+
+  function pageTemplate(group, pageNumber, totalPages) {
+    const company = escapeHtml(els.companyInput.value || 'MAndrews Lighting');
+    const contact = escapeHtml(els.contactInput.value || '');
+    const docTitle = escapeHtml(els.docTitleInput.value || 'Patch by Type');
+    const jobName = escapeHtml(els.jobNameInput.value || 'Imported Patch');
+    const primaryMode = mostCommon(group.items.map(r => r.mode));
+    const primaryChan = mostCommon(group.items.map(r => r.chan));
+    const fontFamily = formatState.fontFamily || 'Arial, Helvetica, sans-serif';
+    const fontWeightOverride = formatState.fontWeightOverride || 'normal';
+
+    const colStyle = {
+      number: styleFromFormat(formatState.columns.number),
+      uni: styleFromFormat(formatState.columns.uni),
+      add: styleFromFormat(formatState.columns.add),
+      type: styleFromFormat(formatState.columns.type),
+      mode: styleFromFormat(formatState.columns.mode),
+      chan: styleFromFormat(formatState.columns.chan),
+      position: styleFromFormat(formatState.columns.position),
+      notes: styleFromFormat(formatState.columns.notes),
+      colour1: styleFromFormat(formatState.columns.colour1),
+      colour2: styleFromFormat(formatState.columns.colour2)
+    };
+
+    const inputStyle = {
+      notes: textInputStyleFromFormat(formatState.columns.notes),
+      colour1: textInputStyleFromFormat(formatState.columns.colour1),
+      colour2: textInputStyleFromFormat(formatState.columns.colour2)
+    };
+
+    const sub = formatState.subheader;
+    const fixtureTitleStyle = [
+      `text-align:${sub.align}`,
+      `font-weight:${sub.bold ? '700' : '400'}`,
+      `font-style:${sub.italic ? 'italic' : 'normal'}`,
+      `text-decoration:${sub.underline ? 'underline' : 'none'}`,
+      `font-size:${sub.size}pt`
+    ].join(';');
+
+    const fixtureModeStyle = [
+      `text-align:${sub.align}`,
+      `font-weight:${sub.bold ? '700' : '400'}`,
+      `font-style:${sub.italic ? 'italic' : 'normal'}`,
+      `text-decoration:${sub.underline ? 'underline' : 'none'}`,
+      `font-size:${Math.max(8, Number(sub.size || 14) - 2)}pt`
+    ].join(';');
+
+    const rowsHtml = group.items.map(row => {
+      const edit = editState[row._key] || { notes: '', colour1: '', colour2: '' };
+      return `
+        <tr>
+          <td style="${colStyle.number}">${escapeHtml(row.number)}</td>
+          <td style="${colStyle.uni}">${escapeHtml(row.uni)}</td>
+          <td style="${colStyle.add}">${escapeHtml(row.add)}</td>
+          <td style="${colStyle.type}">${escapeHtml(row.type)}</td>
+          <td style="${colStyle.mode}">${escapeHtml(row.mode)}</td>
+          <td style="${colStyle.chan}">${escapeHtml(row.chan)}</td>
+          <td style="${colStyle.position}">${escapeHtml(row.position)}</td>
+          <td class="editable-cell notes-col" style="${colStyle.notes}"><textarea style="${inputStyle.notes}" data-edit="notes" data-key="${escapeAttr(row._key)}" rows="1">${escapeHtml(edit.notes || '')}</textarea></td>
+          <td class="editable-cell colour-col" style="${colStyle.colour1}"><input style="${inputStyle.colour1}" class="colour-input" data-edit="colour1" data-key="${escapeAttr(row._key)}" type="text" value="${escapeAttr(edit.colour1 || '')}" /></td>
+          <td class="editable-cell colour-col" style="${colStyle.colour2}"><input style="${inputStyle.colour2}" class="colour-input" data-edit="colour2" data-key="${escapeAttr(row._key)}" type="text" value="${escapeAttr(edit.colour2 || '')}" /></td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <section class="page">
+        <div class="page-inner" style="font-family:${escapeAttr(fontFamily)}; font-weight:${escapeAttr(fontWeightOverride)};">
+          <div class="brand">
+            <div class="brand-left">
+              <h2>${company}</h2>
+              <div class="meta">${contact}</div>
+            </div>
+            <div class="brand-right">${jobName}</div>
+          </div>
+          <div class="page-title">
+            <div style="width:100%;">
+              <div class="fixture-title" style="${fixtureTitleStyle}">${escapeHtml(group.type)}${primaryMode ? ' - ' + escapeHtml(primaryMode) : ''}${primaryChan ? ' (' + escapeHtml(primaryChan) + ' Ch)' : ''}</div>
+              <div class="fixture-mode" style="${fixtureModeStyle}">Quantity: ${group.items.length}</div>
+            </div>
+          </div>
+          <table class="tbl">
+            <colgroup>
+              <col style="width:7%">
+              <col style="width:6%">
+              <col style="width:7%">
+              <col style="width:16%">
+              <col style="width:15%">
+              <col style="width:4%">
+              <col style="width:11%">
+              <col style="width:16%">
+              <col style="width:9%">
+              <col style="width:9%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">#</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Uni</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Add</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Type</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Mode</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Chan</th>
+                <th style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Position</th>
+                <th class="notes-col" style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Notes</th>
+                <th class="colour-col" style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Col 1</th>
+                <th class="colour-col" style="text-align: center; font-weight: 700; font-style: normal; text-decoration: none; font-size: 14pt; background-color: gainsboro;">Col 2</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div class="footer">Page ${pageNumber} of ${totalPages}</div>
+        </div>
+      </section>`;
+  }
+
+  function mostCommon(values) {
+    const counts = new Map();
+    values.filter(Boolean).forEach(v => counts.set(v, (counts.get(v) || 0) + 1));
+    let best = '';
+    let bestCount = 0;
+    counts.forEach((count, value) => {
+      if (count > bestCount) {
+        best = value;
+        bestCount = count;
+      }
+    });
+    return best;
+  }
+
+  function render() {
+    const rows = sortRows(filteredRows());
+    const groups = groupRows(rows);
+
+    setSelectOptions(els.typeFilter, uniqueValues(rawRows, 'type'), 'All Types');
+    setSelectOptions(els.modeFilter, uniqueValues(rawRows, 'mode'), 'All Modes');
+    setSelectOptions(els.uniFilter, uniqueValues(rawRows, 'uni'), 'All Universes');
+    setSelectOptions(els.positionFilter, uniqueValues(rawRows, 'position'), 'All Positions');
+
+    els.rowsCount.textContent = String(rows.length);
+    els.typesCount.textContent = String(new Set(rows.map(r => r.type)).size);
+    els.pagesCount.textContent = String(groups.length);
+    els.unisCount.textContent = String(new Set(rows.map(r => r.uni)).size);
+
+    if (!rawRows.length) {
+      els.pages.innerHTML = '';
+      els.status.textContent = 'No CSV loaded yet.';
+      return;
+    }
+
+    if (!rows.length) {
+      els.pages.innerHTML = '<div class="panel"><p class="warn">No rows match the current filters.</p></div>';
+      els.status.textContent = `${rawRows.length} rows loaded, but current filters return no matches.`;
+      return;
+    }
+
+    els.pages.innerHTML = groups.map((g, i) => pageTemplate(g, i + 1, groups.length)).join('');
+    bindEditableInputs();
+    els.status.textContent = `${rawRows.length} rows loaded. Showing ${rows.length} rows across ${groups.length} page(s).`;
+  }
+
+  function autoGrowTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+
+  function bindEditableInputs() {
+    document.querySelectorAll('[data-edit]').forEach(input => {
+      if (input.dataset.edit === 'colour1' || input.dataset.edit === 'colour2') {
+        applyColourInputStyle(input);
+      }
+
+      if (input.tagName === 'TEXTAREA') {
+        autoGrowTextarea(input);
+      }
+
+      input.addEventListener('input', e => {
+        const key = e.target.dataset.key;
+        const field = e.target.dataset.edit;
+        if (!editState[key]) editState[key] = { notes: '', colour1: '', colour2: '' };
+        if (typeof editState[key].notes !== 'string') editState[key].notes = '';
+        if (typeof editState[key].colour1 !== 'string') editState[key].colour1 = '';
+        if (typeof editState[key].colour2 !== 'string') editState[key].colour2 = '';
+        editState[key][field] = e.target.value;
+        if (field === 'colour1' || field === 'colour2') {
+          applyColourInputStyle(e.target);
+        }
+        if (e.target.tagName === 'TEXTAREA') {
+          autoGrowTextarea(e.target);
+        }
+        saveEditState();
+      });
+    });
+  }
+
+  function applyColourInputStyle(input) {
+    const value = String(input.value || '').trim();
+    if (!value) {
+      input.style.background = '#fff';
+      input.style.color = '#000';
+      input.style.borderColor = '#b8c1cf';
+      return;
+    }
+
+    const resolved = resolveCssColour(value);
+    if (!resolved) {
+      input.style.background = '#fff4c2';
+      input.style.color = '#000';
+      input.style.borderColor = '#d8b400';
+      return;
+    }
+
+    input.style.background = resolved;
+    input.style.color = getReadableTextColour(resolved);
+    input.style.borderColor = '#000';
+  }
+
+  function resolveCssColour(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const map = parseColourMap(els.colourMappingInput.value);
+    const mapped = map[normalizeColourAlias(raw)] || raw;
+
+    const probe = document.createElement('span');
+    probe.style.color = '';
+    probe.style.color = mapped;
+    if (!probe.style.color) return '';
+    probe.style.display = 'none';
+    document.body.appendChild(probe);
+    const computed = getComputedStyle(probe).color;
+    probe.remove();
+    return computed;
+  }
+
+  function getReadableTextColour(rgbString) {
+    const match = String(rgbString).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!match) return '#000';
+    const r = Number(match[1]);
+    const g = Number(match[2]);
+    const b = Number(match[3]);
+    const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
+    return luminance >= 160 ? '#000' : '#fff';
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(value) { return escapeHtml(value); }
+
+  function loadCSVText(text, sourceName) {
+    rawRows = toStructuredRows(text, sourceName);
+    if (!els.jobNameInput.value || els.jobNameInput.value === 'Imported Patch') {
+      els.jobNameInput.value = sourceName.replace(/\.csv$/i, '');
+    }
+  
+
+
+  els.openProjectInfoBtn.addEventListener('click', async () => {
+    renderProjectInfoDialog();
+    try {
+      await syncVendorsFromGoogleSheet();
+    } catch (err) {
+      els.status.textContent = err?.message || 'Could not sync vendors from Google Sheet.';
+      console.error(err);
+    }
+    if (typeof els.projectInfoDialog.showModal === 'function') {
+      els.projectInfoDialog.showModal();
+    } else {
+      els.projectInfoDialog.setAttribute('open', 'open');
+    }
+  });
+
+  els.closeProjectInfoBtn.addEventListener('click', () => {
+    if (typeof els.projectInfoDialog.close === 'function') {
+      els.projectInfoDialog.close();
+    } else {
+      els.projectInfoDialog.removeAttribute('open');
+    }
+  });
+
+  els.projectInfoDialog.addEventListener('click', (e) => {
+    const rect = els.projectInfoDialog.getBoundingClientRect();
+    const inside = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+    if (!inside) {
+      if (typeof els.projectInfoDialog.close === 'function') {
+        els.projectInfoDialog.close();
+      } else {
+        els.projectInfoDialog.removeAttribute('open');
+      }
+    }
+  });
+
+  syncFormatDialog();
+
+  els.fontFamilyInput.addEventListener('change', () => {
+    const value = els.fontFamilyInput.value;
+    if (value === 'Cochin, Georgia, serif|bold') {
+      formatState.fontFamily = 'Cochin, Georgia, serif';
+      formatState.fontWeightOverride = '700';
+    } else {
+      formatState.fontFamily = value;
+      formatState.fontWeightOverride = 'normal';
+    }
+    saveFormatState();
+    render();
+  });
+
+  [els.subheaderAlign, els.subheaderBold, els.subheaderItalic, els.subheaderUnderline, els.subheaderSize].forEach(el => {
+    el.addEventListener('change', () => {
+      formatState.subheader.align = els.subheaderAlign.value;
+      formatState.subheader.bold = !!els.subheaderBold.checked;
+      formatState.subheader.italic = !!els.subheaderItalic.checked;
+      formatState.subheader.underline = !!els.subheaderUnderline.checked;
+      formatState.subheader.size = Number(els.subheaderSize.value || 14);
+      saveFormatState();
+      render();
+    });
+  });
+
+  els.applyColumnFormatBtn.addEventListener('click', () => {
+    const selected = [...document.querySelectorAll('[data-col-select]:checked')].map(el => el.dataset.colSelect);
+    if (!selected.length) return;
+    selected.forEach(key => {
+      formatState.columns[key].align = els.columnAlign.value;
+      formatState.columns[key].bold = !!els.columnBold.checked;
+      formatState.columns[key].italic = !!els.columnItalic.checked;
+      formatState.columns[key].underline = !!els.columnUnderline.checked;
+    });
+    saveFormatState();
+    render();
+
+    els.columnSelectGrid.querySelectorAll('[data-col-select]').forEach(box => {
+      box.checked = false;
+    });
+    els.selectAllColumns.checked = false;
+    els.selectAllColumns.indeterminate = false;
+    els.columnAlign.value = 'center';
+    els.columnBold.checked = false;
+    els.columnItalic.checked = false;
+    els.columnUnderline.checked = false;
+  });
+
+  els.openFormatBtn.addEventListener('click', () => {
+    syncFormatDialog();
+    if (typeof els.formatDialog.showModal === 'function') {
+      els.formatDialog.showModal();
+    } else {
+      els.formatDialog.setAttribute('open', 'open');
+    }
+  });
+
+  els.closeFormatBtn.addEventListener('click', () => {
+    if (typeof els.formatDialog.close === 'function') {
+      els.formatDialog.close();
+    } else {
+      els.formatDialog.removeAttribute('open');
+    }
+  });
+
+  els.formatDialog.addEventListener('click', (e) => {
+    const rect = els.formatDialog.getBoundingClientRect();
+    const inside = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+    if (!inside) {
+      if (typeof els.formatDialog.close === 'function') {
+        els.formatDialog.close();
+      } else {
+        els.formatDialog.removeAttribute('open');
+      }
+    }
+  });
+
+
+  render();
+  }
+
+  const sampleCSV = `#,Uni,Add,Type,Mode,Chan,Position\n101,1,1,Mac Viper XIP,Basic,54,Front Truss\n102,1,55,Mac Viper XIP,Basic,54,Front Truss\n103,1,109,Mac Viper XIP,Basic,54,Front Truss\n104,1,163,Mac Viper XIP,Basic,54,Front Truss\n105,3,1,Mac Viper XIP,Basic,54,Mid Truss\n106,3,55,Mac Viper XIP,Basic,54,Mid Truss\n201,1,217,Mac Aura XIP,Extended,57,Front Truss\n202,1,274,Mac Aura XIP,Extended,57,Front Truss\n203,2,1,Mac Aura XIP,Extended,57,Front Truss\n301,6,1,JDC Burst 1,Mode 4 - 24 Segments,135,DS Floor\n302,6,136,JDC Burst 1,Mode 4 - 24 Segments,135,DS Floor\n303,9,136,JDC Burst 1,Mode 4 - 24 Segments,135,US Floor`;
+  const templateCSV = '#,Uni,Add,Type,Mode,Chan,Position,Col 1,Col 2,Notes\n';
+
+  els.file.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      loadCSVText(text, file.name);
+    } catch (err) {
+      els.status.textContent = 'Could not read that CSV file.';
+      console.error(err);
+    }
+  });
+
+  [els.typeFilter, els.modeFilter, els.uniFilter, els.positionFilter, els.sortField, els.sortDirection,
+   els.companyInput, els.contactInput, els.docTitleInput, els.jobNameInput].forEach(el => {
+    el.addEventListener('change', render);
+    el.addEventListener('input', render);
+  });
+
+  els.colourMappingInput.addEventListener('input', () => {
+    saveColourMapText(els.colourMappingInput.value);
+    document.querySelectorAll('input.colour-input').forEach(applyColourInputStyle);
+  });
+
+  els.mappingFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const rawText = await file.text();
+      const textToUse = /\.csv$/i.test(file.name) ? (convertMappingCsvToText(rawText) || rawText) : rawText;
+      els.colourMappingInput.value = textToUse;
+      saveColourMapText(textToUse);
+      document.querySelectorAll('input.colour-input').forEach(applyColourInputStyle);
+      els.status.textContent = `Loaded colour map from ${file.name}.`;
+    } catch (err) {
+      els.status.textContent = 'Could not read that colour mapping file.';
+      console.error(err);
+    } finally {
+      els.mappingFileInput.value = '';
+    }
+  });
+
+  els.resetMappingBtn.addEventListener('click', () => {
+    els.colourMappingInput.value = defaultColourMapText.trim();
+    saveColourMapText(els.colourMappingInput.value);
+    document.querySelectorAll('input.colour-input').forEach(applyColourInputStyle);
+  });
+
+  els.loadSampleBtn.addEventListener('click', () => loadCSVText(sampleCSV, 'Sample Patch.csv'));
+  els.clearFiltersBtn.addEventListener('click', () => {
+    els.typeFilter.value = '';
+    els.modeFilter.value = '';
+    els.uniFilter.value = '';
+    els.positionFilter.value = '';
+    els.sortField.value = 'default';
+    els.sortDirection.value = 'asc';
+  
+  syncFormatDialog();
+
+  els.fontFamilyInput.addEventListener('change', () => {
+    const value = els.fontFamilyInput.value;
+    if (value === 'Cochin, Georgia, serif|bold') {
+      formatState.fontFamily = 'Cochin, Georgia, serif';
+      formatState.fontWeightOverride = '700';
+    } else {
+      formatState.fontFamily = value;
+      formatState.fontWeightOverride = 'normal';
+    }
+    saveFormatState();
+    render();
+  });
+
+  [els.subheaderAlign, els.subheaderBold, els.subheaderItalic, els.subheaderUnderline, els.subheaderSize].forEach(el => {
+    el.addEventListener('change', () => {
+      formatState.subheader.align = els.subheaderAlign.value;
+      formatState.subheader.bold = !!els.subheaderBold.checked;
+      formatState.subheader.italic = !!els.subheaderItalic.checked;
+      formatState.subheader.underline = !!els.subheaderUnderline.checked;
+      formatState.subheader.size = Number(els.subheaderSize.value || 14);
+      saveFormatState();
+      render();
+    });
+  });
+
+  els.applyColumnFormatBtn.addEventListener('click', () => {
+    const selected = [...document.querySelectorAll('[data-col-select]:checked')].map(el => el.dataset.colSelect);
+    if (!selected.length) return;
+    selected.forEach(key => {
+      formatState.columns[key].align = els.columnAlign.value;
+      formatState.columns[key].bold = !!els.columnBold.checked;
+      formatState.columns[key].italic = !!els.columnItalic.checked;
+      formatState.columns[key].underline = !!els.columnUnderline.checked;
+    });
+    saveFormatState();
+    render();
+
+    els.columnSelectGrid.querySelectorAll('[data-col-select]').forEach(box => {
+      box.checked = false;
+    });
+    els.selectAllColumns.checked = false;
+    els.selectAllColumns.indeterminate = false;
+    els.columnAlign.value = 'center';
+    els.columnBold.checked = false;
+    els.columnItalic.checked = false;
+    els.columnUnderline.checked = false;
+  });
+
+  els.openFormatBtn.addEventListener('click', () => {
+    syncFormatDialog();
+    if (typeof els.formatDialog.showModal === 'function') {
+      els.formatDialog.showModal();
+    } else {
+      els.formatDialog.setAttribute('open', 'open');
+    }
+  });
+
+  els.closeFormatBtn.addEventListener('click', () => {
+    if (typeof els.formatDialog.close === 'function') {
+      els.formatDialog.close();
+    } else {
+      els.formatDialog.removeAttribute('open');
+    }
+  });
+
+  els.formatDialog.addEventListener('click', (e) => {
+    const rect = els.formatDialog.getBoundingClientRect();
+    const inside = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+    if (!inside) {
+      if (typeof els.formatDialog.close === 'function') {
+        els.formatDialog.close();
+      } else {
+        els.formatDialog.removeAttribute('open');
+      }
+    }
+  });
+
+
+  render();
+  });
+  els.printBtn.addEventListener('click', () => window.print());
+  els.downloadTemplateBtn.addEventListener('click', () => {
+    const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'patch_sheet_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  els.openSettingsBtn.addEventListener('click', () => {
+    if (typeof els.settingsDialog.showModal === 'function') {
+      els.settingsDialog.showModal();
+    } else {
+      els.settingsDialog.setAttribute('open', 'open');
+    }
+  });
+
+  els.closeSettingsBtn.addEventListener('click', () => {
+    if (typeof els.settingsDialog.close === 'function') {
+      els.settingsDialog.close();
+    } else {
+      els.settingsDialog.removeAttribute('open');
+    }
+  });
+
+  els.settingsDialog.addEventListener('click', (e) => {
+    const rect = els.settingsDialog.getBoundingClientRect();
+    const inside = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+    if (!inside) {
+      if (typeof els.settingsDialog.close === 'function') {
+        els.settingsDialog.close();
+      } else {
+        els.settingsDialog.removeAttribute('open');
+      }
+    }
+  });
+
+
+  syncFormatDialog();
+
+  els.fontFamilyInput.addEventListener('change', () => {
+    const value = els.fontFamilyInput.value;
+    if (value === 'Cochin, Georgia, serif|bold') {
+      formatState.fontFamily = 'Cochin, Georgia, serif';
+      formatState.fontWeightOverride = '700';
+    } else {
+      formatState.fontFamily = value;
+      formatState.fontWeightOverride = 'normal';
+    }
+    saveFormatState();
+    render();
+  });
+
+  [els.subheaderAlign, els.subheaderBold, els.subheaderItalic, els.subheaderUnderline, els.subheaderSize].forEach(el => {
+    el.addEventListener('change', () => {
+      formatState.subheader.align = els.subheaderAlign.value;
+      formatState.subheader.bold = !!els.subheaderBold.checked;
+      formatState.subheader.italic = !!els.subheaderItalic.checked;
+      formatState.subheader.underline = !!els.subheaderUnderline.checked;
+      formatState.subheader.size = Number(els.subheaderSize.value || 14);
+      saveFormatState();
+      render();
+    });
+  });
+
+  els.applyColumnFormatBtn.addEventListener('click', () => {
+    const selected = [...document.querySelectorAll('[data-col-select]:checked')].map(el => el.dataset.colSelect);
+    if (!selected.length) return;
+    selected.forEach(key => {
+      formatState.columns[key].align = els.columnAlign.value;
+      formatState.columns[key].bold = !!els.columnBold.checked;
+      formatState.columns[key].italic = !!els.columnItalic.checked;
+      formatState.columns[key].underline = !!els.columnUnderline.checked;
+    });
+    saveFormatState();
+    render();
+
+    els.columnSelectGrid.querySelectorAll('[data-col-select]').forEach(box => {
+      box.checked = false;
+    });
+    els.selectAllColumns.checked = false;
+    els.selectAllColumns.indeterminate = false;
+    els.columnAlign.value = 'center';
+    els.columnBold.checked = false;
+    els.columnItalic.checked = false;
+    els.columnUnderline.checked = false;
+  });
+
+  els.openFormatBtn.addEventListener('click', () => {
+    syncFormatDialog();
+    if (typeof els.formatDialog.showModal === 'function') {
+      els.formatDialog.showModal();
+    } else {
+      els.formatDialog.setAttribute('open', 'open');
+    }
+  });
+
+  els.closeFormatBtn.addEventListener('click', () => {
+    if (typeof els.formatDialog.close === 'function') {
+      els.formatDialog.close();
+    } else {
+      els.formatDialog.removeAttribute('open');
+    }
+  });
+
+  els.formatDialog.addEventListener('click', (e) => {
+    const rect = els.formatDialog.getBoundingClientRect();
+    const inside = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+    if (!inside) {
+      if (typeof els.formatDialog.close === 'function') {
+        els.formatDialog.close();
+      } else {
+        els.formatDialog.removeAttribute('open');
+      }
+    }
+  });
+
+
+  (async () => {
+    try {
+      await syncVendorsFromGoogleSheet();
+    } catch (err) {
+      els.status.textContent = err?.message || 'Could not sync vendors from Google Sheet.';
+      console.error(err);
+    }
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
