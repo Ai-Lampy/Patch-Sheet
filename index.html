@@ -1136,7 +1136,7 @@
   */
 
 </style>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <style id="dynamicPageStyle"></style>
@@ -3382,15 +3382,22 @@ SILVER=silver`;
 
 
   async function readExcelFileAsCSV(file) {
-    if (typeof XLSX === 'undefined') {
-      throw new Error('XLSX library did not load.');
-    }
+    const waitForXLSX = async () => {
+      for (let i = 0; i < 30; i++) {
+        if (typeof window.XLSX !== 'undefined') return window.XLSX;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      throw new Error('XLSX library did not load. Check internet/CDN access.');
+    };
+
+    const XLSXLib = await waitForXLSX();
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = XLSXLib.read(arrayBuffer, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) throw new Error('No worksheets found.');
     const worksheet = workbook.Sheets[firstSheetName];
-    return XLSX.utils.sheet_to_csv(worksheet, { blankrows: false });
+
+    return XLSXLib.utils.sheet_to_csv(worksheet, { blankrows: false });
   }
 
   function toStructuredRows(csvText, sourceName = 'Imported CSV') {
@@ -5435,7 +5442,13 @@ SILVER=silver`;
 
   if (els.importXlsmBtn) {
     els.importXlsmBtn.addEventListener('click', () => {
-      if (els.importExcelInput) els.importExcelInput.click();
+      if (!els.importExcelInput) {
+        alert('Excel import input is missing.');
+        return;
+      }
+      if (els.status) els.status.textContent = 'Choose an XLSM / XLSX file...';
+      els.importExcelInput.value = '';
+      els.importExcelInput.click();
     });
   }
   if (els.importGrandmaCsvBtn) {
